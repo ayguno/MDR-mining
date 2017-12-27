@@ -56,50 +56,143 @@ herceptin_reactions <- fromJSON('https://api.fda.gov/drug/event.json?search=rece
 
 
 # Let's exercise this for DIARRHOEA, the most common event associated with Herceptin
-yearlyPRR <- function(event,drug){
+yearlyPRR <- function(event,drug, start.date = "1998-01-01", end.date = as.character(Sys.Date())){
+        
+        # Returns yearly PRR scores for a given drug for a given event
+        
+        
         require(jsonlite)
         require(lubridate)
         require(dplyr)
         
-        today <- gsub("-","",as.character(Sys.Date()))
-        drug <- toupper(drug)
+        end.date <- gsub("-","", end.date)
+        start.date <- gsub("-","", start.date)
         
-        temp <- data.frame(receipt_year = year, 
-                           reports_with_drug_and_event = 0,
-                           reports_with_drug = 0,
-                           reports_with_event_in_database = 0,
-                           reports_in_database = 0,
-                           PRR = 0
-                           )
+        drug <- toupper(drug)
+        event <- toupper(event)
+        
         #######################################################
         #This requires internet connection!
         #Perform openFDA API inquiries to obtain relevant data
         ########################################################
-        reports_with_drug_and_event <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[19980101+TO+',today,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)+AND+patient.reaction.reactionmeddrapt.exact=',event,'&count=receivedate'))$results
+        reports_with_drug_and_event <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)+AND+patient.reaction.reactionmeddrapt.exact=',event,'&count=receivedate'))$results
         reports_with_drug_and_event$year <- substr(as.character(reports_with_drug_and_event$time), 1,4)
         reports_with_drug_and_event <- reports_with_drug_and_event %>% group_by(year) %>% summarise(reports_with_drug_and_event = sum(count))
         
-        reports_with_drug <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[19980101+TO+',today,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=receivedate'))$results
+        reports_with_drug <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=receivedate'))$results
         reports_with_drug$year <- substr(as.character(reports_with_drug$time), 1,4)
         reports_with_drug <- reports_with_drug %>% group_by(year) %>% summarise(reports_with_drug = sum(count)) 
         
-        reports_with_event_in_database <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[19980101+TO+',today,']+AND+patient.reaction.reactionmeddrapt.exact=',event,'&count=receivedate'))$results
+        reports_with_event_in_database <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.reaction.reactionmeddrapt.exact=',event,'&count=receivedate'))$results
         reports_with_event_in_database$year <- substr(as.character(reports_with_event_in_database$time), 1,4)
         reports_with_event_in_database <- reports_with_event_in_database %>% group_by(year) %>% summarise(reports_with_event_in_database = sum(count))
         
-        reports_in_database <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[19980101+TO+',today,']&count=receivedate'))$results
+        reports_in_database <- fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']&count=receivedate'))$results
         reports_in_database$year <- substr(as.character(reports_in_database$time), 1,4)
         reports_in_database <- reports_in_database %>% group_by(year) %>% summarise(reports_in_database = sum(count))
         
-        ### CONTINUE HERE ###
-        
         # Merge the above reports based on years 
+        temp <- merge(reports_with_drug_and_event,reports_with_drug,by = "year", all.x = T, all.y = F, sort = F)
+        temp <- merge(temp,reports_with_event_in_database,by = "year", all.x = T, all.y = F, sort = F)
+        temp <- merge(temp,reports_in_database,by = "year", all.x = T, all.y = F, sort = F)
         
-        # Add a "total reports" column to give the N (this should be cumulative version of current reports_in_database variable, which is just per year)
-        # Similarly, correct the "reports_with_drug" column to give n (this should also be cumulative)
+        # Calculate PRR for each year:
+        # PRR = (m/n)/( (M-m)/(N-n) )
+        # Where; 
+                 m = temp$reports_with_drug_and_event #reports with drug and event
+                 n = temp$reports_with_drug #reports with drug
+                 M = temp$reports_with_event_in_database #reports with event in database
+                 N = temp$reports_in_database #reports in database
         
-        # Calculate PRR for each year
-        
-        # Return a nice dataframe with results
+                 temp$PRR <- (m/n)/( (M-m)/(N-n) )
+                 
+                 temp$drug <- drug
+                 temp$event <- event
+        # Return a nice dataframe with 
+        return(temp)         
 }
+
+
+# Let's try to parse information systematically for all drugs in our list
+essential <- read.csv("essential_table.csv", stringsAsFactors = F)
+essential <- essential[!(essential$PMA == ""),]
+
+# Need to perform some cleaning
+essential$Drug.Trade.Name.Generic.Name. <- gsub("\\?","",essential$Drug.Trade.Name.Generic.Name.)
+
+
+# Clean for Oncomine cases
+x <- essential[6,]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- unlist(strsplit(x$Drug.Trade.Name.Generic.Name.," "))
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-6,]
+essential<- rbind(essential, x) # Oncomine added
+
+# Clean for Idhifa (enasidenib),50 and 100 mg tablets
+
+x <- essential[4,]
+
+x$Drug.Trade.Name.Generic.Name.
+
+x.drugs <- c("Idhifa 50mg", "Idhifa 100mg")
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-4,]
+essential<- rbind(essential, x) # Idhifa added
+
+
+# Cleaning for The cobas? KRAS Mutation Test
+
+x <- essential[which(essential$Device.Trade.Name == "The cobas? KRAS Mutation Test"),]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *|;","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- unlist(strsplit(x$Drug.Trade.Name.Generic.Name.," "))[c(1,3)]
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-17,]
+essential<- rbind(essential, x) #  added
+
+# therascreen KRAS RGQ PCR Kit
+
+x <- essential[which(essential$Device.Trade.Name == "therascreen KRAS RGQ PCR Kit"),]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *|;","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- unlist(strsplit(x$Drug.Trade.Name.Generic.Name.," "))[c(1,3)]
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-18,]
+essential<- rbind(essential, x) #  added
+
+# DAKO EGFR PharmDx Kit
 
