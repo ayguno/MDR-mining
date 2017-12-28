@@ -69,7 +69,7 @@ yearlyPRR <- function(event,drug, start.date = "1998-01-01", end.date = as.chara
         start.date <- gsub("-","", start.date)
         
         drug <- toupper(drug)
-        event <- toupper(event)
+        event <- gsub(" ","+",toupper(event))
         
         #######################################################
         #This requires internet connection!
@@ -111,6 +111,57 @@ yearlyPRR <- function(event,drug, start.date = "1998-01-01", end.date = as.chara
         # Return a nice dataframe with 
         return(temp)         
 }
+
+
+#####################################
+# Write a function that calculates PRR from all reports associated with all events for a given drug
+# Use the yearlyPRR function described above
+
+drugPRR <- function(drug,start.date = "1998-01-01", end.date = as.character(Sys.Date())){
+        
+        require(jsonlite)
+        require(lubridate)
+        require(dplyr)
+        
+        end.date <- gsub("-","", end.date)
+        start.date <- gsub("-","", start.date)
+        
+        drug <- toupper(drug)
+        # Get the names of events associated with a drug in a given time window
+        
+        events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term)
+        
+        store.temp <- yearlyPRR(drug=drug,event=events.list[1])
+        
+        if(length(events.list) > 50){
+                ## it will time out if it takes too long
+                for(i in 2:50){
+                        store.temp <- rbind(store.temp,yearlyPRR(drug=drug,event=events.list[i]))  
+                } 
+                ## it will time out if it takes too long
+                for(i in 51:length(events.list)){
+                        store.temp <- rbind(store.temp,yearlyPRR(drug=drug,event=events.list[i]))  
+                } 
+        }else
+        {
+                for(i in 2:length(events.list)){
+                        store.temp <- rbind(store.temp,yearlyPRR(drug=drug,event=events.list[i]))  
+                }     
+        }
+        
+}
+
+
+Herceptin.Data <- drugPRR("Herceptin")
+
+
+
+
+
+
+
+
+
 
 
 # Let's try to parse information systematically for all drugs in our list
@@ -195,4 +246,156 @@ essential <- essential[-18,]
 essential<- rbind(essential, x) #  added
 
 # DAKO EGFR PharmDx Kit
+
+x <- essential[which(essential$Device.Trade.Name == "DAKO EGFR PharmDx Kit"),]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *|;","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- unlist(strsplit(x$Drug.Trade.Name.Generic.Name.," "))
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-18,]
+essential<- rbind(essential, x) #  added
+
+
+# HERCEPTEST
+
+x <- essential[which(essential$Device.Trade.Name == "HERCEPTEST"),]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *|;","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- c("Herceptin","Perjeta", "Kadcyla")
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-29,]
+essential<- rbind(essential, x) #  added
+
+
+# HER2 FISH PharmDx Kit
+
+x <- essential[which(essential$Device.Trade.Name == "HER2 FISH PharmDx Kit"),]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *|;","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- c("Herceptin","Perjeta", "Kadcyla")
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-29,]
+essential<- rbind(essential, x) #  added
+
+# THxID? BRAF Kit
+
+x <- essential[which(essential$Device.Trade.Name == "THxID? BRAF Kit"),]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *|;","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- unlist(strsplit(x$Drug.Trade.Name.Generic.Name.," "))[c(1,3)]
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-29,]
+essential<- rbind(essential, x) #  added
+
+
+# DAKO C-KIT PharmDx
+
+
+x <- essential[which(essential$Device.Trade.Name == "DAKO C-KIT PharmDx"),]
+
+x$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *|;","",x$Drug.Trade.Name.Generic.Name.)
+
+x.drugs <- c("Gleevec","Glivec")
+
+for(i in seq_along(x.drugs)){
+        x <- rbind(x,x)   
+}
+
+x$Drug.Trade.Name.Generic.Name.[1:length(x.drugs)] <- x.drugs
+x <- x[1:length(x.drugs),]
+
+essential <- essential[-20,]
+essential<- rbind(essential, x) #  added
+
+
+essential$Drug.Trade.Name.Generic.Name. <- gsub("*\\(.*?\\) *","",essential$Drug.Trade.Name.Generic.Name.)
+
+# Save this relatively clean version of the essential table
+write.csv(essential,"essential_clean.csv")
+
+###############################################################
+# Read files back to start developing a prototype application
+###############################################################
+
+essential.clean <- read.csv("essential_clean.csv")
+Herceptin.Data <- readRDS("herceptin_data.rds")
+
+# List of drugs
+drug.list <- stringr::str_trim(unique(as.character(essential.clean$Drug.Trade.Name.Generic.Name.)))
+
+# Save to use in the app later:
+saveRDS(drug.list,"/Users/OZANAYGUN/Desktop/2016/Data_science/companion/drug_list.rds")
+
+# General query to bring events list for a given drug
+events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term)
+
+
+start.date = "1998-01-01"; end.date = as.character(Sys.Date());drug = "HERCEPTIN"
+Herceptin.events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term)
+
+# Save to use in the app later:
+saveRDS(Herceptin.events.list,"/Users/OZANAYGUN/Desktop/2016/Data_science/companion/Herceptin.events.list.rds")
+
+######################################################
+# Prepare time-series plots using the drug PPR data
+######################################################
+
+drug.data <- Herceptin.Data[Herceptin.Data$event == "FATIGUE",] # Use for the example, generalize later
+
+##################################################################################
+# Input: data frame generated by yearlyPRR
+
+# Infer and Set the date range from the drug table:
+year.range <- range(drug.data$year)
+
+start_date <- date(format(paste(year.range[1],"01","01", sep = "-")))
+end_date <- date(format(paste(year.range[2],"01","01", sep = "-")))
+
+# Set the yearly points as the end of the year
+drug.data$end.year <- date(format(paste(drug.data$year,"12","30",sep = "-")))
+
+p <- ggplot(data = drug.data , aes(x = end.year , y = PRR))+
+     geom_line(colour = "purple", size = 2)+
+     geom_point(colour = "navy", size = 4)+
+     labs(x="Date", y = "PRR", title = paste0("Yearly PRR of adverse event ",unique(drug.data$event)," for drug ",unique(drug.data$drug)))+
+        theme(panel.background=element_rect(fill = "white",colour = "black"),
+              panel.border=element_rect(colour = "black", fill = NA),
+              plot.title = element_text(hjust = 0.5, face = "bold",size = 15),
+              axis.title = element_text(size = 13, face = "bold"),
+              axis.text = element_text(size = 13, face = "bold"))
+
+return(p)
+##################################################################################
 
