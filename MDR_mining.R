@@ -377,12 +377,152 @@ essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.N
 drug.list[which(drug.list == "midostaurin")] <- "rydapt"
 essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.Name.Generic.Name. == "midostaurin")] <- "rydapt"
 
+#Clean for idhifa (if doesn't work, later change to enasidenib)
+drug.list[grepl("idhifa", drug.list)] <- "idhifa"
+essential.clean$Drug.Trade.Name.Generic.Name.[grepl("idhifa", essential.clean$Drug.Trade.Name.Generic.Name.)] <- "idhifa"
+
+# Continue cleaning the essential table:
+
+drug.device.table <- dplyr::select(essential.clean,Drug.Trade.Name.Generic.Name.,
+                                   Device.Trade.Name,PMA,Device.Manufacturer,
+                                   Intended.Use..IU....Indications.for.Use..IFU.)
+
+# Further clean drug.device.table
+colnames(drug.device.table)[1] <- "Drug.Trade.Name"
+colnames(drug.device.table)[5] <- "IU_or_IFU"
+
+# Convert all features to chr:
+
+for(i in 1:ncol(drug.device.table)){
+        drug.device.table[,i] <- as.character(drug.device.table[,i])
+}
+
+# Capitalize the device names
+drug.device.table$Device.Trade.Name <- toupper(drug.device.table$Device.Trade.Name)
+
+
+# Remove ? from the device names
+drug.device.table$Device.Trade.Name <- gsub("\\?","",drug.device.table$Device.Trade.Name)
+
+# Save to use in the app later:
+saveRDS(drug.device.table,"/Users/OZANAYGUN/Desktop/2016/Data_science/companion/drug.device.table.rds")
+
 
 drug.list <- unique(drug.list)
 
 # Save to use in the app later:
 saveRDS(drug.list,"/Users/OZANAYGUN/Desktop/2016/Data_science/companion/drug_list.rds")
 saveRDS(essential.clean,"/Users/OZANAYGUN/Desktop/2016/Data_science/companion/essential_further_clean.rds")
+
+
+################################################################
+# CHALLENGE: How are we going to find devices that has MDRs?
+################################################################
+
+setwd("~/Desktop/2016/Data_science/MDR-mining")
+
+drug.device.table <- readRDS("/Users/OZANAYGUN/Desktop/2016/Data_science/companion/drug.device.table.rds")
+
+# Since device names in MDRs are not always exact device name, we need a partial srting match algorithm:
+device.list <- unique(drug.device.table$Device.Trade.Name)
+# Create an empy data.frame with 2 rows MDR_REPORT_KEY, BRAND_NAME
+
+parsed.device <- data.frame(MDR_REPORT_KEY = "NULL", BRAND_NAME = "NULL")
+skiprows <- 0
+
+for (chunks_to_repeat in 1:77){ # repeat 77 times to span entire data set
+# Read 1000 rows from device MDR data list (ideally only two columns):
+        # MDR_REPORT_KEY
+        # BRAND_NAME
+
+chunk <- read.delim("foidev.txt", sep = "|", nrows = 10000,col.names = c("MDR_REPORT_KEY",rep("NULL",5),"BRAND_NAME",rep("NULL",21)), 
+                                                                colClasses = c("character",rep("NULL",5),"character",
+                                                                        rep("NULL",21)), skip = skiprows)    
+        cat("Changing chunks skiprows: ",skiprows, "\n")
+
+        for (i in seq_along(device.list)){
+        # For each element in the device list:
+        # Look for exact name matches, if any catch them
+                
+                device.name <- device.list[i]
+                
+                cat("Looking for exact matches, skiprows: ",skiprows,"device :",device.name ,"\n")
+                
+                chunk.brand.name <- gsub("<ae>","",chunk$BRAND_NAME)
+                chunk.brand.name <- gsub("\\\xae","",chunk.brand.name)
+                if(any(grepl(device.name, chunk.brand.name))){
+                        # Extract MDR_REPORT_KEY and BRAND_NAME as data.frame
+                        temp.exact <- chunk[grepl(device.name, chunk.brand.name),]
+                        parsed.device <- rbind(parsed.device,temp.exact)
+                }
+                
+                cat("Found :", sum(grepl(device.name, chunk.brand.name)) ," exact matches, skiprows: ",skiprows,"device :",device.name ,"\n")
+                
+        # Look for partial matches that give at least 75% match with any device name in the current chunk
+                for(j in seq_along(chunk.brand.name)){
+                        
+                        cat("Looking for partial matches, skiprows: ",skiprows,"device :",device.name,"chunk.brand.name: ",j,": ",chunk.brand.name[j] ,"\n")
+                        
+                        total.length <- length(unlist(strsplit(device.name," ")))
+                        match.length <- sum(!is.na(pmatch(unlist(strsplit(device.name," ")),head(unlist(strsplit(chunk.brand.name[j]," "))),20)))
+                        if(match.length == 0){
+                                match.ratio <- 0
+                        }else
+                        {
+                                match.ratio <- match.length/total.length
+                        }
+                        if (match.ratio >= 0.75) {
+                                # Extract MDR_REPORT_KEY and BRAND_NAME as data.frame
+                                temp.partial <- chunk[j,]
+                                parsed.device <- rbind(parsed.device,temp.partial)
+                        } 
+                        
+                        how.many <- ifelse(match.length == 0, 0,nrow(temp.partial)) 
+                        cat("Found: ",how.many," partial matches, skiprows: ",skiprows,"device :",device.name,"chunk.brand.name: ",j,": ",chunk.brand.name[j] ,"\n")
+                        
+                }
+                
+        }
+skiprows <- skiprows + 10000
+}
+
+saveRDS(parsed.device,"parsed_device.rds")
+
+######################################################################################
+
+parsed.device <- readRDS("parsed_device.rds") # Not accurate!!
+###############################################################
+
+# This is not going to be feasible, we need to work on the drug.device.table to determine whic
+# device names bring meaningful queries from openFDA API
+
+# When doing that we can try to use error handling functions:
+
+        # try() , tryCatch() or withRestart() 
+# This is a good start:
+x <- try(silent = T,expr = events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term))
+
+# For instance:
+
+sample.list <- list(1,2,4,"abc",6,7,8)
+
+# Loop stuck at error:
+for(i in sample.list){
+        print(log(i))
+}
+
+# Loop throws error but can still proceed to end since we wrapped the error generating expression with try()
+for(i in sample.list){
+        try(print(log(i)))
+}
+
+# Loop even doesn't throw the error, silently ignores it!!
+for(i in sample.list){
+        try(print(log(i)), silent = T)
+}
+
+# We can use the same approach for our jsonCalls to API and skip error generating queries!
+##########################################################################
 
 # General query to bring events list for a given drug
 events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term)
