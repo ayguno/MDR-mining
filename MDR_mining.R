@@ -352,11 +352,37 @@ write.csv(essential,"essential_clean.csv")
 essential.clean <- read.csv("essential_clean.csv")
 Herceptin.Data <- readRDS("herceptin_data.rds")
 
+essential.clean$Drug.Trade.Name.Generic.Name. <- tolower(as.character(essential.clean$Drug.Trade.Name.Generic.Name.))
+
 # List of drugs
 drug.list <- stringr::str_trim(unique(as.character(essential.clean$Drug.Trade.Name.Generic.Name.)))
 
+# Change Glivec to Imatinib
+drug.list[which(drug.list == "Glivec")] <- "Imatinib"
+essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.Name.Generic.Name. == "Glivec")] <- "Imatinib"
+
+# Change imatinib mesylate to Gleevec
+drug.list[which(drug.list == "imatinib mesylate")] <- "gleevec"
+essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.Name.Generic.Name. == "imatinib mesylate")] <- "gleevec"
+
+# Change pembrolizumab to keytruda
+drug.list[which(drug.list == "pembrolizumab")] <- "keytruda"
+essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.Name.Generic.Name. == "pembrolizumab")] <- "keytruda"
+
+#Change Ceritinib to Zykadia
+drug.list[which(drug.list == "ceritinib")] <- "zykadia"
+essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.Name.Generic.Name. == "ceritinib")] <- "zykadia"
+
+#Change midostaurin to rydapt
+drug.list[which(drug.list == "midostaurin")] <- "rydapt"
+essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.Name.Generic.Name. == "midostaurin")] <- "rydapt"
+
+
+drug.list <- unique(drug.list)
+
 # Save to use in the app later:
 saveRDS(drug.list,"/Users/OZANAYGUN/Desktop/2016/Data_science/companion/drug_list.rds")
+saveRDS(essential.clean,"/Users/OZANAYGUN/Desktop/2016/Data_science/companion/essential_further_clean.rds")
 
 # General query to bring events list for a given drug
 events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term)
@@ -398,4 +424,8 @@ p <- ggplot(data = drug.data , aes(x = end.year , y = PRR))+
 
 return(p)
 ##################################################################################
+
+drug = "keytruda"
+events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term)
+
 
