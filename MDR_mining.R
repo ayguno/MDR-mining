@@ -378,8 +378,8 @@ drug.list[which(drug.list == "midostaurin")] <- "rydapt"
 essential.clean$Drug.Trade.Name.Generic.Name.[which(essential.clean$Drug.Trade.Name.Generic.Name. == "midostaurin")] <- "rydapt"
 
 #Clean for idhifa (if doesn't work, later change to enasidenib)
-drug.list[grepl("idhifa", drug.list)] <- "idhifa"
-essential.clean$Drug.Trade.Name.Generic.Name.[grepl("idhifa", essential.clean$Drug.Trade.Name.Generic.Name.)] <- "idhifa"
+drug.list[grepl("idhifa", drug.list)] <- "enasidenib"
+essential.clean$Drug.Trade.Name.Generic.Name.[grepl("idhifa", essential.clean$Drug.Trade.Name.Generic.Name.)] <- "enasidenib"
 
 # Continue cleaning the essential table:
 
@@ -567,5 +567,23 @@ return(p)
 
 drug = "keytruda"
 events.list <- unique(fromJSON(paste0('https://api.fda.gov/drug/event.json?search=receivedate:[',start.date,'+TO+',end.date,']+AND+patient.drug.openfda.brand_name.exact:(%22',drug,'%22)&count=patient.reaction.reactionmeddrapt.exact'))$results$term)
+
+
+ggplot(mtcars, aes(x = wt, y = mpg)) + geom_blank() +geom_text(label = "Some text",size = 3)
+
+
+df <- data.frame(x = 5, y = 50)
+ggplot(df, aes(x,y)) + geom_blank() + xlim(0, 10) + ylim(0, 100)+geom_text(label = "Some text",size = 10)
+
+
+# Changing the hover text in ggplotly()
+a= "some text" 
+b= "some more text"
+
+g <- ggplot(df, aes(x,y)) + 
+        geom_point(aes(text=sprintf("letter: %s<br>Letter: %s", a, b)))
+
+(gg <- ggplotly(g))
+
 
 
