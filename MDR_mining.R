@@ -13,7 +13,7 @@ x <- fromJSON("https://api.fda.gov/device/event.json?search=HERCEPTEST&count=eve
 
 x <- fromJSON("https://api.fda.gov/device/event.json?search=HERCEPTEST&count=date_of_event")
 
-y <- fromJSON('https://api.fda.gov/device/event.json?search="PATHVYSION"&count=device.openfda.device_name')
+y <- fromJSON('https://api.fda.gov/device/event.json?search="PATHVYSION"&count=device.openfda.brand_name')
 
 y$results
 
