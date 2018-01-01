@@ -586,4 +586,29 @@ g <- ggplot(df, aes(x,y)) +
 (gg <- ggplotly(g))
 
 
+PMA.data <- get.state.PMA()
 
+
+######################################
+# The code below can plot the submissions as a nice US state map!
+######################################
+
+states_map <- map_data("state")
+
+
+g <- ggplot(PMA.data, aes(map_id = state.name)) +
+        geom_polygon(data=states_map, aes(x=states_map$long, y=states_map$lat, map_id = region),
+                     size = 0.25,colour='violet', fill=NA)+
+        geom_map(aes(fill = count), map = states_map, color=NA, size = 0.1) +
+        scale_fill_continuous(low='thistle2', high='darkred', 
+                              guide='colorbar', name = "Number of\nsubmissions") +
+        expand_limits(x = states_map$long, y = states_map$lat)+
+        labs(x=NULL, y=NULL,
+             title = "Distribution of submissions across the United States")+
+        #coord_map("albers", lat0 = 39, lat1 = 45)+ 
+        theme(panel.border = element_blank())+
+        theme(panel.background = element_blank())+
+        theme(axis.ticks = element_blank())+
+        theme(axis.text = element_blank())+
+        theme(title = element_text(face = "bold",size = 8)) 
+ggplotly(g)
